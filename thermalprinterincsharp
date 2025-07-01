@@ -1,0 +1,135 @@
+using System;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+
+public class LanPrinterControl
+{
+    private TcpClient client;
+    private NetworkStream stream;
+
+    public LanPrinterControl(string ipAddress, int port = 9100)
+    {
+        try
+        {
+            client = new TcpClient();
+            client.Connect(ipAddress, port);
+            stream = client.GetStream();
+            Console.WriteLine($"Printer connected successfully at {ipAddress}:{port}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error connecting to printer: {ex.Message}");
+            throw;
+        }
+    }
+
+    private void SendCommand(string command)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(command);
+        stream.Write(bytes, 0, bytes.Length);
+        stream.Flush();
+        Thread.Sleep(50);
+    }
+
+    private void SendCommand(byte[] command)
+    {
+        stream.Write(command, 0, command.Length);
+        stream.Flush();
+        Thread.Sleep(50);
+    }
+
+    public void ResetPrinter()
+    {
+        SendCommand(new byte[] { 0x1B, 0x40 });  // ESC @
+    }
+
+    public void SetBoldText(bool enable)
+    {
+        SendCommand(new byte[] { 0x1B, 0x45, (byte)(enable ? 1 : 0) }); // ESC E n
+    }
+
+    public void SetAlignment(string align)
+    {
+        byte value = align.ToLower() switch
+        {
+            "center" => (byte)1,
+            "right" => (byte)2,
+            _ => (byte)0,
+        };
+        SendCommand(new byte[] { 0x1B, 0x61, value }); // ESC a n
+    }
+
+    public void SetLineSpacing(int spacing = 30)
+    {
+        SendCommand(new byte[] { 0x1B, 0x33, (byte)spacing }); // ESC 3 n
+    }
+
+    public void PrintText(string text, bool bold = false, string align = "left")
+    {
+        SetAlignment(align);
+        SetBoldText(bold);
+        SendCommand(text);
+        SendCommand("\n");
+        SetBoldText(false);
+    }
+
+    public void FeedLines(int lines = 1)
+    {
+        for (int i = 0; i < lines; i++)
+        {
+            SendCommand("\n");
+        }
+    }
+
+    public void CutPaper()
+    {
+        SendCommand(new byte[] { 0x1D, 0x56, 0x00 }); // ESC i (cut)
+    }
+
+    public void PrintReceipt()
+    {
+        ResetPrinter();
+        SetLineSpacing(24);
+
+        PrintText("RECEIPT EXAMPLE", true, "center");
+        PrintText("Thank you for your purchase!", false, "center");
+
+        FeedLines(1);
+        PrintText("Item: Apples      $10.00");
+        PrintText("Item: Bananas     $5.00");
+
+        FeedLines(1);
+        PrintText("TOTAL: $15.00", true);
+
+        FeedLines(1);
+        PrintText("Visit Again!", false, "center");
+
+        FeedLines(2);
+        CutPaper();
+    }
+
+    public void Close()
+    {
+        stream?.Close();
+        client?.Close();
+    }
+}
+
+// Example usage
+class Program
+{
+    static void Main()
+    {
+        try
+        {
+            LanPrinterControl printer = new LanPrinterControl("192.168.1.100"); // Replace with your printer's IP
+            printer.PrintReceipt();
+            printer.Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}
