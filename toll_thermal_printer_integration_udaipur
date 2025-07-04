@@ -143,10 +143,8 @@ public class RawPrinterHelper
         return mono;
     }
 
-
-    public static void PrintReceipt(string vehicleNumber, string total, string paid, string change, string paymode, string foc)
+    public static void PrintReceipt(string vehicleNumber, string vehicleType, string journeyType, string fee, string ticketNo, string operatorName)
     {
-        Console.WriteLine($"Vehicle: {vehicleNumber}, Total: {total}, Paid: {paid}, Change: {change}, Mode: {paymode}, FOC: {foc}");
         string printerName = "POS80 Printer(2)";
         var encoding = Encoding.ASCII;
         var data = new List<byte>();
@@ -154,42 +152,52 @@ public class RawPrinterHelper
         // Initialize printer
         data.AddRange(new byte[] { 0x1B, 0x40 }); // ESC @
 
-        // ✅ Add the logo before text
+        // Add merged logo + text image
         try
         {
             string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logo.png");
             byte[] logoBytes = ConvertImageToRasterBytes(logoPath);
             data.AddRange(logoBytes);
+            data.AddRange(new byte[] { 0x0A }); // Line feed
         }
         catch (Exception ex)
         {
             Console.WriteLine("Logo error: " + ex.Message);
         }
 
-        // Center alignment and double height
-        data.AddRange(new byte[] { 0x1B, 0x61, 0x01 }); // ESC a 1 (center)
-        data.AddRange(new byte[] { 0x1B, 0x21, 0x20 }); // ESC ! 0x20 (double height)
-        data.AddRange(encoding.GetBytes("Udaipur Toll Plaza\n"));
-        data.AddRange(new byte[] { 0x1B, 0x21, 0x00 }); // ESC ! 0 (normal)
-        data.AddRange(encoding.GetBytes("**** VEHICLE EXIT RECEIPT ****\n"));
+        data.AddRange(new byte[] { 0x1B, 0x4D, 0x01 });
+        // ===== Header =====
+        data.AddRange(encoding.GetBytes("\n"));
+        data.AddRange(encoding.GetBytes("Toll Plaza Name  : Talapady Toll Plaza\n"));
+        data.AddRange(encoding.GetBytes("                  (Km 16+600 on NH 16+600)\n"));
+        data.AddRange(encoding.GetBytes("Section          : Nanthoor to Talapady\n"));
+        data.AddRange(encoding.GetBytes("                  (Km 1+900 on NH 17+200)\n"));
+        data.AddRange(encoding.GetBytes("Contractor's Name: Navayuga Udupi Tollway Pvt. Ltd.\n"));  // You can customize this line
 
-        // Left-align for details
-        data.AddRange(new byte[] { 0x1B, 0x61, 0x00 }); // ESC a 0 (left)
-        data.AddRange(encoding.GetBytes($"Vehicle No : {vehicleNumber}\n"));
-        data.AddRange(encoding.GetBytes($"Pay Mode   : {paymode}\n"));
-        data.AddRange(encoding.GetBytes($"Total      : Rs{total}\n"));
-        data.AddRange(encoding.GetBytes($"Paid       : Rs{paid}\n"));
-        data.AddRange(encoding.GetBytes($"Change     : Rs{change}\n"));
-        data.AddRange(encoding.GetBytes($"Exemption  : {foc}\n"));
-        data.AddRange(encoding.GetBytes($"Time       : {DateTime.Now:dd-MM-yyyy HH:mm:ss}\n"));
+        // ===== Ticket Info =====
+        data.AddRange(encoding.GetBytes($"Ticket No       : {ticketNo}\n"));
+        data.AddRange(encoding.GetBytes($"Booth & Operator: 6 & {operatorName}\n"));
+        data.AddRange(encoding.GetBytes($"Date & Time     : {DateTime.Now:dd-MMM-yyyy hh:mm tt}\n"));
+        data.AddRange(encoding.GetBytes($"Vehicle No      : {vehicleNumber}\n"));
+        data.AddRange(encoding.GetBytes($"Type of Vehicle : {vehicleType}\n"));
+        data.AddRange(encoding.GetBytes($"Type of Journey : {journeyType}\n"));
+        data.AddRange(encoding.GetBytes($"Fee             : Rs {fee}\n"));
 
-        // Footer
-        data.AddRange(encoding.GetBytes("Thank you! Drive Safe!\n"));
+        // ===== Overload Section =====
+        data.AddRange(encoding.GetBytes("\nOnly for overloaded vehicle\n"));
+        data.AddRange(encoding.GetBytes("Standard Wt. of vehicle : \n"));
+        data.AddRange(encoding.GetBytes("Actual Wt. of vehicle   : \n"));
+        data.AddRange(encoding.GetBytes("Overloaded Vehicle Fee : \n"));
 
-        // Cut
-        data.AddRange(new byte[] { 0x1D, 0x56, 0x00 }); // GS V 0
+        // ===== Footer =====
+        data.AddRange(new byte[] { 0x0A, 0x1B, 0x61, 0x01 }); // Line feed + Center align
+        data.AddRange(encoding.GetBytes("WISH YOU SAFE & HAPPY JOURNEY!\n"));
+
+        // Cut paper
+        data.AddRange(new byte[] { 0x1D, 0x56, 0x00 }); // GS V 0 - full cut
 
         // Send to printer
         SendBytesToPrinter(printerName, data.ToArray());
     }
+
 }
