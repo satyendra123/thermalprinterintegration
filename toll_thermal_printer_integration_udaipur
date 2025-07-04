@@ -201,3 +201,46 @@ public class RawPrinterHelper
     }
 
 }
+
+
+Note- this is the python code which generates the logo and the text using python code 
+from PIL import Image, ImageDraw, ImageFont
+
+# Load your original resized logo (384x100)
+logo = Image.open("logo.png")
+final_width = 384
+final_height = 100
+logo_width = 100
+
+# Resize logo to fit left side
+logo_resized = logo.resize((logo_width, final_height))
+combined = Image.new("1", (final_width, final_height), 1)  # 1-bit mode
+
+# Paste logo
+combined.paste(logo_resized, (0, 0))
+
+# Draw text
+draw = ImageDraw.Draw(combined)
+
+# Font size
+font_size = 20
+font = ImageFont.truetype("arialbd.ttf", font_size)
+
+# Lines of full text
+lines = [
+    "National Highways Authority of India",
+    "Navayuga Udupi Tollway Pvt. Ltd.",
+    "Talapady Toll Plaza, KM-16+600"
+]
+
+# Draw text closer to the logo
+x_text = logo_width + 10  # reduced from +10
+y_text = 10
+line_spacing = font_size + 10
+
+for line in lines:
+    draw.text((x_text, y_text), line, font=font, fill=0)
+    y_text += line_spacing
+
+# Save final image
+combined.save("logo_with_full_text_final.png")
